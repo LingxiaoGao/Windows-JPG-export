@@ -1,0 +1,55 @@
+name: Windows portable build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+          architecture: x64
+          cache: pip
+      - name: Install locked dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Core tests, onedir build, frozen tests, GUI smoke, SHA256
+        run: python build_release.py
+      - name: Isolated portable smoke with no Python or ExifTool on PATH
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path dist/WindowsJPGExporter/WindowsJPGExporter.exe).Path
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $env:PYTHONPATH = ''
+          $env:PYTHONHOME = ''
+          $env:TCL_LIBRARY = ''
+          $env:TK_LIBRARY = ''
+          $process = Start-Process -FilePath $exe -ArgumentList '--gui-smoke', "$PWD\build\isolated-gui.json" -WindowStyle Hidden -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw 'Isolated GUI failed' }
+          $gui = Get-Content build/isolated-gui.json -Raw | ConvertFrom-Json
+          if (-not $gui.gui_started -or -not $gui.drag_drop) { throw 'Missing bundled GUI runtime' }
+      - name: Upload downloadable portable ZIP and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: WindowsJPGExporter-v3.0.0-win-x64
+          path: |
+            release/*.zip
+            release/*.sha256
+            build/packaged-tests/*
+            build/gui-smoke.json
+            build/isolated-gui.json
+          if-no-files-found: error
+      - name: Upload diagnostic logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: |
+            build/source-tests/*
+            build/packaged-tests/*
+            build/WindowsJPGExporter/warn-*.txt

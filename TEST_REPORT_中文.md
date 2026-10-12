@@ -1,0 +1,15 @@
+# 测试报告 · v3.0.0
+
+源码核心验收已运行 20 项测试并通过。打包后 EXE 的实际机器结果以 `test-results/test_results.json`、`test_results.txt` 和 `gui-smoke.json` 为准；构建脚本只有在冻结测试和 GUI 启动检查通过时才生成最终 ZIP。
+
+测试覆盖：原样 ARW/JPG 字节一致；禁 RAW 解码；8 种方向与镜像；低分辨率不放大；纯 RAW、纯 JPG、混合文件夹；同名冲突；A98 ICC 实际转换；GPS/XMP/IPTC/注释清理且保留拍摄字段；真实噪声图质量降级至 4MB；最低 88 仍超 4MB 保留 2560px；元数据清理不改变 JPEG 压缩扫描数据；取消/恢复；损坏图继续；模拟有限锁重试、磁盘不足；嵌套目录拒绝；配置变化和损坏输出重做；中文路径；预检不完整解码；暂停/继续；稳定扁平命名和 4096 预设。
+
+ARW 测试使用合成 TIFF 容器，含 SONY Make、EXIF 和 PreviewImage；它不含实际传感器 RAW。GPS 测试确实写入测试 JPEG 的 GPS/XMP 后导出并重新读取验证。4MB 测试使用确定性 RGB 噪声，实际编码并计算文件字节数，不仅模拟文件大小。
+
+锁占用和磁盘不足使用注入故障测试；未通过拔掉真实外置硬盘或占满用户磁盘验证。源码测试不等于 EXE 测试，EXE 检查单独运行。
+
+打包配置为 Windows x64、PyInstaller onedir/windowed、asInvoker、longPathAware；运行时和 ExifTool 随包提供。CI 增加清空 Python/ExifTool PATH 的隔离启动检查。这只能证明不依赖 PATH 中安装的 Python/ExifTool，不能称为未安装 Python 的干净虚拟机验证。
+
+尚未验证：真实 Sony A1/A1 II；曾触发 rawpy 的真实竖拍；高速连拍；真实 Lightroom/Capture One 输出；Windows 10 干净虚拟机；多个 Windows 图片查看器逐个比较；数千张/数百 GB 持续压力；网络盘和所有长路径变体。未声称这些项目通过。
+
+本地首轮冻结测试发现 ExifTool 子进程异常，未交付该失败产物；正在修复子进程 DLL 搜索环境并重新验收。成功发布包须附最终结果与具体构建记录。
