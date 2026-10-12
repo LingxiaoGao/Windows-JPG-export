@@ -1,7 +1,7 @@
 name: Windows portable build
 on:
   push:
-    branches: [main]
+    branches: [main, portable-exporter-v3]
   workflow_dispatch:
 permissions:
   contents: read
@@ -53,3 +53,4 @@ jobs:
             build/source-tests/*
             build/packaged-tests/*
             build/WindowsJPGExporter/warn-*.txt
+
