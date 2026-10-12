@@ -16,6 +16,7 @@ jobs:
           python-version: '3.12.10'
           architecture: x64
           cache: pip
+          cache-dependency-path: requirements-build.txt
       - name: Install locked dependencies
         run: python -m pip install -r requirements-build.txt
       - name: Core tests, onedir build, frozen tests, GUI smoke, SHA256
