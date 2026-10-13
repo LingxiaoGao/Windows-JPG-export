@@ -1,4 +1,4 @@
-# 测试报告 · v3.0.0
+# 测试报告 · v3.0.1
 
 源码核心验收已运行 20 项测试并通过。打包后 EXE 的实际机器结果以 `test-results/test_results.json`、`test_results.txt` 和 `gui-smoke.json` 为准；构建脚本只有在冻结测试和 GUI 启动检查通过时才生成最终 ZIP。
 
@@ -12,4 +12,6 @@ ARW 测试使用合成 TIFF 容器，含 SONY Make、EXIF 和 PreviewImage；它
 
 尚未验证：真实 Sony A1/A1 II；曾触发 rawpy 的真实竖拍；高速连拍；真实 Lightroom/Capture One 输出；Windows 10 干净虚拟机；多个 Windows 图片查看器逐个比较；数千张/数百 GB 持续压力；网络盘和所有长路径变体。未声称这些项目通过。
 
-本地首轮冻结测试发现 ExifTool 子进程异常，未交付该失败产物；正在修复子进程 DLL 搜索环境并重新验收。成功发布包须附最终结果与具体构建记录。
+本地首轮冻结测试发现 ExifTool 子进程异常，未交付失败产物。使用完整、校验过的 Windows 供应包并隔离 DLL 搜索环境后，GitHub Actions 构建 38316370098 已通过冻结 EXE 的 20 项测试及隔离启动检查，对应提交 fea8570ea720180e2950e572d6a5542860fb3fa7。
+
+v3.0.1 修正实际界面检查发现的高 DPI 控件裁切：窗口按内容和屏幕自适应，完整界面可滚动。该版本仍须通过同样的云端冻结验收，最终结果见包内机器记录。

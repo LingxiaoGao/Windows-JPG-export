@@ -76,7 +76,7 @@ def main():
     gui_report = ROOT / 'build' / 'gui-smoke.json'
     run([str(executable), '--gui-smoke', str(gui_report)])
     gui = json.loads(gui_report.read_text(encoding='utf-8'))
-    if not all((gui['gui_started'], gui['drag_drop'], gui['buttons_ready'], gui['presets'] == 3)):
+    if not all((gui['gui_started'], gui['drag_drop'], gui['buttons_ready'], gui['presets'] == 3, gui['scrolling_available'])):
         raise RuntimeError('GUI smoke test failed')
     for name in ('README_中文.md', 'AUDIT_中文.md', 'TEST_REPORT_中文.md', 'THIRD_PARTY_LICENSES.md', 'LICENSE'):
         shutil.copy2(ROOT / name, portable / name)
@@ -90,7 +90,7 @@ def main():
     (portable / 'MANIFEST.sha256').write_text('\n'.join(manifest) + '\n', encoding='utf-8')
     release = ROOT / 'release'
     release.mkdir(exist_ok=True)
-    archive = release / 'WindowsJPGExporter-v3.0.0-win-x64.zip'
+    archive = release / 'WindowsJPGExporter-v3.0.1-win-x64.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as z:
         for path in portable.rglob('*'):
             if path.is_file():

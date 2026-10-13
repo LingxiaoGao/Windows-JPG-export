@@ -52,6 +52,12 @@ class App:
         self.style()
         self.build()
         self.set_preset()
+        root.update_idletasks()
+        screen_w, screen_h = root.winfo_screenwidth(), root.winfo_screenheight()
+        width = min(max(960, self.body.winfo_reqwidth() + 50), max(640, screen_w - 100))
+        height = min(max(790, self.body.winfo_reqheight() + 60), max(500, screen_h - 100))
+        root.minsize(min(760, width), min(550, height))
+        root.geometry(f"{width}x{height}")
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.after(100, self.poll)
 
@@ -72,8 +78,23 @@ class App:
         style.configure("TCheckbutton", background="#f3f5f8", font=("Microsoft YaHei UI", 10))
 
     def build(self):
-        outer = ttk.Frame(self.root, padding=(24, 20))
-        outer.pack(fill="both", expand=True)
+        # Tk fonts scale with DPI while geometry may remain in physical pixels.
+        # A scrollable body makes every control reachable on small/high-DPI screens.
+        host = ttk.Frame(self.root)
+        host.pack(fill="both", expand=True)
+        host.rowconfigure(0, weight=1)
+        host.columnconfigure(0, weight=1)
+        self.viewport = tk.Canvas(host, bg="#f3f5f8", highlightthickness=0)
+        self.viewport.grid(row=0, column=0, sticky="nsew")
+        vertical = ttk.Scrollbar(host, orient="vertical", command=self.viewport.yview)
+        vertical.grid(row=0, column=1, sticky="ns")
+        horizontal = ttk.Scrollbar(host, orient="horizontal", command=self.viewport.xview)
+        horizontal.grid(row=1, column=0, sticky="ew")
+        self.viewport.configure(yscrollcommand=vertical.set, xscrollcommand=horizontal.set)
+        outer = self.body = ttk.Frame(self.viewport, padding=(24, 20))
+        body_id = self.viewport.create_window((0, 0), window=outer, anchor="nw")
+        outer.bind("<Configure>", lambda e: self.viewport.configure(scrollregion=self.viewport.bbox("all")))
+        self.viewport.bind("<Configure>", lambda e: self.viewport.itemconfigure(body_id, width=max(e.width, outer.winfo_reqwidth())))
         ttk.Label(outer, text="让照片直接可分享", style="Title.TLabel").pack(anchor="w")
         ttk.Label(outer, text="RAW 只提取机内 JPEG · 支持已有 JPG · 本机离线处理 · 原照片只读", style="Sub.TLabel").pack(anchor="w", pady=(4, 16))
         paths = ttk.Frame(outer)
@@ -146,6 +167,14 @@ class App:
         self.cancel_button.pack(side="left", padx=8)
         ttk.Button(bottom, text="查看错误详情", command=self.show_errors).pack(side="right")
         ttk.Button(bottom, text="打开输出文件夹", command=self.open_output).pack(side="right", padx=8)
+        def wheel(event):
+            self.viewport.yview_scroll(-int(event.delta / 120), "units")
+            return "break"
+        widgets = [outer, self.viewport]
+        while widgets:
+            widget = widgets.pop()
+            widget.bind("<MouseWheel>", wheel)
+            widgets.extend(widget.winfo_children())
 
     def set_preset(self):
         s = core.Settings.preset(self.mode.get())
@@ -382,7 +411,9 @@ def main():
         def smoke():
             target.write_text(json.dumps(dict(gui_started=True, title=root.title(),
                 drag_drop=bool(root.tk.call("package", "present", "tkdnd")),
-                presets=len(app.preset_buttons), buttons_ready=str(app.start_button.cget("state")) == "normal")), encoding="utf-8")
+                presets=len(app.preset_buttons), buttons_ready=str(app.start_button.cget("state")) == "normal",
+                scrolling_available=True, window_size=[root.winfo_width(),root.winfo_height()],
+                content_size=[app.body.winfo_reqwidth(),app.body.winfo_reqheight()])), encoding="utf-8")
             root.destroy()
         root.after(1200, smoke)
     root.mainloop()

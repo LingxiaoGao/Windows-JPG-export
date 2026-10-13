@@ -22,7 +22,7 @@ import uuid
 from PIL import Image, ImageCms, ImageOps, ImageFilter
 import embedded_legacy as legacy
 
-VERSION = "3.0.0"
+VERSION = "3.0.1"
 MODES = {"original": "JPEG_Original", "wechat": "JPEG_WeChat_2560", "share": "JPEG_Share_4096"}
 EXIF_TAGS = (
     "Make", "Model", "DateTimeOriginal", "CreateDate", "OffsetTimeOriginal",
