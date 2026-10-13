@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+build/
+dist/
+release/
+resources/exiftool/
+test_results/
