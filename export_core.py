@@ -21,8 +21,9 @@ import time
 import uuid
 from PIL import Image, ImageCms, ImageOps, ImageFilter
 import embedded_legacy as legacy
+import exiftool_runtime
 
-VERSION = "3.0.1"
+VERSION = "3.0.2"
 MODES = {"original": "JPEG_Original", "wechat": "JPEG_WeChat_2560", "share": "JPEG_Share_4096"}
 EXIF_TAGS = (
     "Make", "Model", "DateTimeOriginal", "CreateDate", "OffsetTimeOriginal",
@@ -105,7 +106,7 @@ def resource_root():
 def exiftool_path():
     bundled = resource_root() / "resources" / "exiftool" / "exiftool.exe"
     if bundled.is_file():
-        return str(bundled)
+        return exiftool_runtime.prepare(bundled)
     if getattr(sys, "frozen", False):
         raise RuntimeError("内置 ExifTool 缺失，请完整解压便携 ZIP")
     return legacy.get_exiftool(r"C:\Tools\ExifTool\exiftool.exe")[0]
@@ -415,7 +416,7 @@ def export_photo(photo, out, settings, exe, control):
 
 def config_hash(settings, inp, exe, photo):
     data = dict(settings=asdict(settings), input=str(inp.resolve()), version=VERSION,
-                executable=str(exe), output=photo.output_relative.as_posix())
+                executable=exiftool_runtime.identity(exe), output=photo.output_relative.as_posix())
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
 

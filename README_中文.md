@@ -1,6 +1,10 @@
-# 照片高清导出器 v3.0.1 · Windows 10/11 x64 便携版
+# 照片高清导出器 v3.0.2 · Windows 10/11 x64 便携版
 
 解压整个 ZIP，打开 `WindowsJPGExporter` 文件夹，双击 `WindowsJPGExporter.exe`。保留旁边的 `_internal` 文件夹；无需安装 Python、Pillow 或 ExifTool。照片处理离线完成，不上传照片、不采集遥测、无需管理员权限。
+
+v3.0.2 修复程序解压到中文目录时 ExifTool 报 `Could not find ... perl5*.dll` 的问题。程序会校验完整的内置 ExifTool；需要时自动将工具复制到独立的英文临时目录，核对全部文件 SHA-256 后运行，正常退出自动清理。不移动或复制输入照片。临时路径变化不会破坏断点续跑。若组件确实缺失或被隔离，会明确提示完整重新解压；不需要安装 Perl。
+
+若旧版暂时无法升级，可先将整个 `WindowsJPGExporter` 文件夹移动到纯英文路径（例如 `C:\WindowsJPGExporter`）再运行；照片和输出目录仍可包含中文。若机器同时没有可写英文临时目录、也不支持短路径，新版会给出相同的移动程序提示。
 
 ## 日常操作
 

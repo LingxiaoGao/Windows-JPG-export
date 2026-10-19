@@ -12,8 +12,9 @@ ARW 仅提取内嵌 JPEG，禁止 RAW 解码；源照片严格只读。
 - [测试报告与限制](TEST_REPORT_中文.md)
 - [依赖和许可](THIRD_PARTY_LICENSES.md)
 
-GitHub Actions 在 `main` 更新时自动使用 Windows 2022 x64 runner 构建。
+GitHub Actions 在开发分支 `portable-exporter-v3` 更新时使用 Windows 2022 x64 runner 构建。
 只有源码测试、冻结 EXE 测试、GUI 运行检查通过才发布便携 ZIP 产物。
+v3.0.2 增加程序目录含中文/空格/emoji 的冻结测试、GUI 检查、内置运行时完整性校验及临时目录变化后的断点复用检查。
 构建页面的 Artifacts 包含便携 ZIP 和 SHA-256。
 
 开发者复现（用户日常无需执行）：Python 3.12 x64 安装

@@ -37,13 +37,15 @@ jobs:
       - name: Upload downloadable portable ZIP and checksums
         uses: actions/upload-artifact@v4
         with:
-          name: WindowsJPGExporter-v3.0.1-win-x64
+          name: WindowsJPGExporter-v3.0.2-win-x64
           path: |
             release/*.zip
             release/*.sha256
             build/packaged-tests/*
             build/gui-smoke.json
             build/isolated-gui.json
+            build/unicode-packaged-tests/*
+            build/unicode-gui-smoke.json
           if-no-files-found: error
       - name: Upload diagnostic logs on failure
         if: failure()
@@ -53,5 +55,6 @@ jobs:
           path: |
             build/source-tests/*
             build/packaged-tests/*
+            build/unicode-packaged-tests/*
             build/WindowsJPGExporter/warn-*.txt
 

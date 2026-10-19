@@ -108,7 +108,7 @@ def run_exiftool(exiftool: str, *args):
     # No shell/redirection, no write options, and no user ExifTool configuration.
     env = os.environ.copy()
     if os.name == "nt":
-        for key in ("LC_ALL", "LC_CTYPE", "LANG"):
+        for key in ("LC_ALL", "LC_CTYPE", "LANG", "PERL5LIB", "PERLLIB", "PERL5OPT", "PERL_UNICODE", "PERLIO"):
             env.pop(key, None)
     lines = list(map(str, args))
     if any("\n" in value or "\r" in value for value in lines):

@@ -15,6 +15,8 @@ import tempfile
 import threading
 import time
 import unittest
+import shutil
+import exiftool_runtime as runtime
 from PIL import Image, ImageDraw, ImageCms
 import export_core as core
 DIAGNOSTICS = []
@@ -332,6 +334,56 @@ class Acceptance(unittest.TestCase):
         summary,rows=self.run_batch(s)
         self.assertEqual(summary["success"],2)
         self.assertTrue(all(r["resolution_below_target"] for r in rows))
+
+    def runtime_copy(self, folder):
+        target = self.root / folder / 'exiftool'
+        shutil.copytree(core.resource_root() / 'resources/exiftool', target)
+        return target
+
+    def test_21_unicode_program_path_forces_safe_runtime_and_mixed_export(self):
+        vendor = self.runtime_copy('程序 中文 📷')
+        with patch.object(runtime, '_ascii_path', side_effect=lambda p: p if str(p).isascii() else None):
+            exe = runtime.prepare(vendor / 'exiftool.exe')
+        self.assertTrue(str(exe).isascii())
+        self.assertNotEqual(Path(exe).parent, vendor)
+        version, _ = core.tool(exe, '-ver')
+        self.assertEqual(version.strip(), b'13.59')
+        self.photo('DSC00001.JPG')
+        self.photo('照片.ARW', jpeg((1600, 1000), None), raw=True)
+        photos, _ = core.scan(self.inp, self.out)
+        before = {p.path: (hashlib.sha256(p.path.read_bytes()).hexdigest(), p.path.stat().st_mtime_ns) for p in photos}
+        summary = core.batch(photos, self.inp, self.out, core.Settings(), core.Control(), exe=exe)
+        self.assertEqual((summary['success'], summary['failed']), (2, 0))
+        for path, expected in before.items():
+            self.assertEqual((hashlib.sha256(path.read_bytes()).hexdigest(), path.stat().st_mtime_ns), expected)
+        DIAGNOSTICS.append(dict(test='unicode_runtime', source=str(vendor), staged=exe, mixed_success=2))
+
+    def test_22_missing_perl_dll_has_clear_error(self):
+        vendor = self.runtime_copy('missing_runtime')
+        next((vendor / 'exiftool_files').glob('perl5*.dll')).unlink()
+        with self.assertRaisesRegex(RuntimeError, '内置 ExifTool 文件缺失或损坏'):
+            runtime.prepare(vendor / 'exiftool.exe')
+
+    def test_23_resume_across_different_temporary_runtime_paths(self):
+        first = self.runtime_copy('程序一')
+        second = self.runtime_copy('程序二')
+        with patch.object(runtime, '_ascii_path', side_effect=lambda p: p if str(p).isascii() else None):
+            exe1 = runtime.prepare(first / 'exiftool.exe')
+            exe2 = runtime.prepare(second / 'exiftool.exe')
+        self.assertNotEqual(exe1, exe2)
+        self.assertEqual(runtime.identity(exe1), runtime.identity(exe2))
+        self.photo('resume.JPG')
+        photos, _ = core.scan(self.inp, self.out)
+        summary = core.batch(photos, self.inp, self.out, core.Settings(), core.Control(), exe=exe1)
+        self.assertEqual(summary['success'], 1)
+        summary = core.batch(photos, self.inp, self.out, core.Settings(), core.Control(), exe=exe2)
+        self.assertEqual((summary['skipped'], summary['failed']), (1, 0))
+
+    def test_24_tampered_vendor_does_not_execute(self):
+        vendor = self.runtime_copy('tampered_runtime')
+        (vendor / 'exiftool_files/exiftool.pl').write_bytes(b'tampered')
+        with self.assertRaisesRegex(RuntimeError, 'checksum mismatch'):
+            runtime.prepare(vendor / 'exiftool.exe')
 
 
 def run_self_test(target):
