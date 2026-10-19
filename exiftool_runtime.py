@@ -38,7 +38,8 @@ def validate(directory):
         records = json.loads((directory / MANIFEST).read_text(encoding='utf-8'))
         required = ('exiftool.exe', 'exiftool_files/perl.exe',
                     'exiftool_files/exiftool.pl', 'exiftool_files/lib/Image/ExifTool.pm')
-        if not isinstance(records, dict) or not all(name in records for name in required):
+        names = {name.casefold() for name in records} if isinstance(records, dict) else set()
+        if not all(name.casefold() in names for name in required):
             raise ValueError('incomplete manifest')
         if not any(Path(name).name.startswith('perl5') and name.endswith('.dll') for name in records):
             raise ValueError('Perl DLL missing from manifest')

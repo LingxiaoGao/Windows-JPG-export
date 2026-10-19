@@ -187,6 +187,8 @@ class Embedded:
     tag: str
     orientation: int | None
     color_space: int | None
+    container_format: str = "JPEG"
+    frames: int = 1
 
 
 class EmbeddedError(RuntimeError):
@@ -207,13 +209,15 @@ def choose_embedded(exiftool: str, src: Path, minimum: int):
                 notes.append(f"{tag}: absent")
                 continue
             with Image.open(io.BytesIO(payload)) as im:
-                if im.format != "JPEG":
-                    raise ValueError("embedded data is not JPEG")
+                if im.format not in ("JPEG", "MPO") or not payload.startswith(b"\xff\xd8\xff"):
+                    raise ValueError(f"embedded data is not JPEG (detected {im.format})")
+                im.seek(0)  # Sony MPF/MPO JPEG: use the primary photo, not its preview.
                 im.load()  # Validate the embedded JPEG, never the sensor RAW.
                 exif = im.getexif()
                 color = exif.get_ifd(34665).get(40961)
                 candidates.append(Embedded(payload, im.width, im.height, tag,
-                                           orientation_value(exif.get(274)), color))
+                                           orientation_value(exif.get(274)), color,
+                                           im.format, getattr(im, "n_frames", 1)))
         except (RuntimeError, OSError, ValueError, SyntaxError) as exc:
             notes.append(f"{tag}: {exc}")
     if not candidates:

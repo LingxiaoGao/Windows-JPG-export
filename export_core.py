@@ -40,6 +40,7 @@ FIELDS = (
     "resolution_below_target", "size_over_limit", "status", "error", "processed_at",
     "elapsed_seconds", "byte_identical", "metadata_only", "orientation", "orientation_note",
     "color_note", "input_jpeg_sha256", "output_sha256", "warnings", "config_hash",
+    "input_format", "input_frames",
 )
 
 
@@ -189,19 +190,23 @@ def input_jpeg(exe, src: Path, full=True):
     else:
         # Ordinary JPEG does not pass through the RAW extraction path.
         c = inspect_jpeg(src.read_bytes(), "source_jpeg", full)
+    if c.container_format == "MPO":
+        warnings.append(f"MPF/MPO JPEG（{c.frames} 幅）：分享模式仅导出主画面；原样模式保留完整文件")
     return c, meta, warnings
 
 
 def inspect_jpeg(payload, tag, full):
     with Image.open(io.BytesIO(payload)) as im:
-        if im.format != "JPEG":
-            raise ValueError("输入不是 JPEG")
+        if im.format not in ("JPEG", "MPO") or not payload.startswith(b"\xff\xd8\xff"):
+            raise ValueError(f"文件内容不是 JPEG（实际格式：{im.format}）；请检查扩展名")
+        im.seek(0)
         if full:
             im.load()
         exif = im.getexif()
         color = exif.get_ifd(34665).get(40961)
         return legacy.Embedded(payload, im.width, im.height, tag,
-                               legacy.orientation_value(exif.get(274)), color)
+                               legacy.orientation_value(exif.get(274)), color,
+                               im.format, getattr(im, "n_frames", 1))
 
 
 def resolve(c, meta, mode, source="auto"):
@@ -254,6 +259,7 @@ def a98_profile():
 def rgb_image(c, orientation, meta):
     target = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB"))
     with Image.open(io.BytesIO(c.payload)) as source:
+        source.seek(0)
         embedded_icc = source.info.get("icc_profile")
         source.getexif()[274] = orientation
         with ImageOps.exif_transpose(source) as oriented:
@@ -338,6 +344,7 @@ def export_photo(photo, out, settings, exe, control):
                source_type=photo.path.suffix[1:].upper(), source_size=stat.st_size,
                source_mtime_ns=stat.st_mtime_ns, embedded_tag=c.tag,
                input_width=c.width, input_height=c.height, input_jpeg_bytes=len(c.payload),
+               input_format=c.container_format, input_frames=c.frames,
                output_path=str(dest), mode=settings.mode, orientation=ori or "",
                orientation_note=ori_note, input_jpeg_sha256=hashlib.sha256(c.payload).hexdigest(),
                status="ok", error="", processed_at=legacy.now(), gps_removed=False,
@@ -368,7 +375,9 @@ def export_photo(photo, out, settings, exe, control):
                     im = sharpened
                 row.update(resized=resize, rotated=ori != 1, icc_converted=color_changed,
                            color_note=note, output_width=im.width, output_height=im.height)
-                need_encode = resize or ori != 1 or color_changed or settings.sharpen
+                # Never retain MPO auxiliary frames (which may contain private
+                # metadata) in a sharing output. Emit one ordinary JPEG instead.
+                need_encode = resize or ori != 1 or color_changed or settings.sharpen or c.container_format == "MPO"
                 cap = round(settings.max_mb * 1_000_000) if settings.max_mb else 0
                 quality = settings.quality
                 while True:
@@ -396,7 +405,8 @@ def export_photo(photo, out, settings, exe, control):
         # Check complete JPEG and dimensions before atomic publication.
         with Image.open(temp) as check:
             check.load()
-            if check.format != "JPEG" or check.size != (row["output_width"], row["output_height"]):
+            allowed = ("JPEG", "MPO") if settings.mode == "original" else ("JPEG",)
+            if check.format not in allowed or check.size != (row["output_width"], row["output_height"]):
                 raise RuntimeError("输出完整性检查失败")
             if settings.mode != "original" and check.getexif().get(274) != 1:
                 raise RuntimeError("输出方向检查失败")

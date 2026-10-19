@@ -79,6 +79,19 @@ def image_scan(payload):
     raise ValueError("No SOS")
 
 
+def mpo(orientation=1):
+    primary = Image.open(io.BytesIO(jpeg((1200, 800), orientation)))
+    auxiliary = Image.new('RGB', (240, 160), (80, 20, 220))
+    output = io.BytesIO()
+    try:
+        primary.save(output, format='MPO', save_all=True, append_images=[auxiliary],
+                     exif=primary.getexif().tobytes(), quality=95)
+    finally:
+        primary.close()
+        auxiliary.close()
+    return output.getvalue()
+
+
 def corners(im):
     w,h = im.size
     colors = ((240,10,10),(10,240,10),(10,10,240),(240,240,10))
@@ -385,6 +398,59 @@ class Acceptance(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'checksum mismatch'):
             runtime.prepare(vendor / 'exiftool.exe')
 
+    def test_25_vendor_filename_case_is_windows_compatible(self):
+        vendor = self.runtime_copy('case_runtime')
+        manifest = vendor / runtime.MANIFEST
+        records = json.loads(manifest.read_text(encoding='utf-8'))
+        key = next(name for name in records if name.casefold() == 'exiftool.exe')
+        records['EXIFTOOL.EXE'] = records.pop(key)
+        manifest.write_text(json.dumps(records), encoding='utf-8')
+        self.assertTrue(runtime.validate(vendor))
+
+    def test_26_mpf_jpg_primary_frame_oriented_single_jpeg(self):
+        for orientation in (1, 8):
+            path = self.photo(f'sony_{orientation}.JPG', mpo(orientation))
+            with Image.open(path) as image:
+                self.assertEqual((image.format, image.n_frames), ('MPO', 2))
+        summary, rows = self.run_batch()
+        self.assertEqual((summary['success'], summary['failed']), (2, 0))
+        for row in rows:
+            self.assertEqual((row['input_format'], row['input_frames']), ('MPO', 2))
+            self.assertTrue(row['reencoded'])
+            self.assertFalse(row['metadata_only'])
+            self.assertIn('MPF/MPO', row['warnings'])
+            with Image.open(row['output_path']) as image:
+                self.assertEqual(image.format, 'JPEG')
+                self.assertEqual(getattr(image, 'n_frames', 1), 1)
+                self.assertEqual(image.size, (800, 1200) if '8.JPG' in row['relative_path'] else (1200, 800))
+                self.assertEqual(image.getexif().get(274), 1)
+
+    def test_27_mpf_original_is_byte_identical(self):
+        payload = mpo(8)
+        path = self.photo('sony.JPG', payload)
+        snap = hashlib.sha256(path.read_bytes()).hexdigest(), path.stat().st_mtime_ns
+        summary, rows = self.run_batch(core.Settings.preset('original'))
+        self.assertEqual(summary['success'], 1)
+        self.assertEqual(Path(rows[0]['output_path']).read_bytes(), payload)
+        self.assertEqual((hashlib.sha256(path.read_bytes()).hexdigest(), path.stat().st_mtime_ns), snap)
+
+    def test_28_mpf_embedded_in_arw_uses_primary(self):
+        self.photo('sony.ARW', mpo(1), raw=True, orientation=1)
+        summary, rows = self.run_batch()
+        self.assertEqual(summary['success'], 1)
+        self.assertEqual(rows[0]['input_format'], 'MPO')
+        with Image.open(rows[0]['output_path']) as image:
+            self.assertEqual((image.format, image.size), ('JPEG', (1200, 800)))
+
+    def test_29_renamed_png_is_not_treated_as_jpeg(self):
+        buffer = io.BytesIO()
+        with Image.new('RGB', (30, 20)) as image:
+            image.save(buffer, 'PNG')
+        self.photo('wrong.JPG', buffer.getvalue())
+        summary, rows = self.run_batch()
+        self.assertEqual((summary['success'], summary['failed']), (0, 1))
+        self.assertIn('PNG', rows[0]['error'])
+
 
 def run_self_test(target):
     target.mkdir(parents=True,exist_ok=True)
@@ -392,7 +458,7 @@ def run_self_test(target):
     result=unittest.TextTestRunner(stream=stream,verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(Acceptance))
     report=dict(version=core.VERSION,tests=result.testsRun,passed=result.wasSuccessful(),
                 failures=len(result.failures),errors=len(result.errors),frozen=bool(getattr(sys,"frozen",False)),
-                executable=sys.executable,exiftool=core.exiftool_path(),
+                executable=sys.executable,exiftool=getattr(Acceptance, 'exe', 'initialization failed'),
                 fixtures="Synthetic TIFF/JPEG; no real Sony ARW provided", diagnostics=DIAGNOSTICS)
     (target/"test_results.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
     (target/"test_results.txt").write_text(stream.getvalue(),encoding="utf-8")
